@@ -14,8 +14,8 @@
  *
  * @wordpress-plugin
  * Plugin Name:       mi-versicherung
- * Plugin URI:        https://kachelblitz@bitbucket.org/kachelblitz/mi-versicherung.git
- * Description:       This is a short description of what the plugin does. It's displayed in the WordPress admin area.
+ * Plugin URI:        https://kachelblitz@bitbucket.org/mai-internet/mi-versicherung.git
+ * Description:       Versicherungs-Makler Plugin. Arbeitet nur mit Theme mi-makler
  * Version:           1.0.0
  * Author:            Michael Mai
  * Author URI:        https://mai-internet.de
