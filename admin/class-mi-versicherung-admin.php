@@ -55,6 +55,8 @@ class Mi_Versicherung_Admin {
 
 	}
 
+	private $my_database = DB_NAME;
+
 	/**
 	 * Register the stylesheets for the admin area.
 	 *
@@ -264,7 +266,7 @@ class Mi_Versicherung_Admin {
 							if ( $url === false ) {
 								$titel = get_sub_field( 'broschuere_titel' );
 								$titel = $titel ? $titel : 'unbekannte Datei';
-								$html .= '<span style="color:#aa0000;">Datei fehlt: ' . $titel . '</span>';
+								$html  .= '<span style="color:#aa0000;">Datei fehlt: ' . $titel . '</span>';
 							} elseif ( ! is_numeric( $id ) ) {
 								$html .= "- fehlt - ";
 							} else {
@@ -314,6 +316,161 @@ class Mi_Versicherung_Admin {
 		} );
 	}
 
-// add_action( 'init', 'custom_post_versicherung', 0 );
+	// Admin Panel for importing menu, etc:
+
+	function register_versicherung_admin() {
+		// Dieser Hook ist steuert die Methode, die die eigene Admin Seite aufbaut:
+		add_submenu_page( 'edit.php?post_type=versicherung', 'admin', 'admin', 'administrator', 'versicherung_admin_page', array( $this, 'versicherung_admin_page' ) );
+		// Dieser Hook steuert, welche Methode nach submit (action) aufgerufen wird:
+		add_action( 'admin_action_versicherung_import_menu', array( $this, 'versicherung_import_menu' ) );
+	}
+
+	function versicherung_admin_page() {
+		?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">Admin Page for Referenzen (ACHTUNG!)</h1>
+
+            <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+                <input type="hidden" name="action" value="versicherung_import_menu"/>
+                <input type="submit" value="Menü für Versicherungen neu aufbauen"/>
+            </form>
+
+        </div>
+		<?php
+	}
+
+	/**
+	 * Array
+	 * (
+	 * [menu-item-db-id] => 0
+	 * [menu-item-object-id] => 2301
+	 * [menu-item-object] => versicherung
+	 * [menu-item-parent-id] => 0
+	 * [menu-item-position] =>
+	 * [menu-item-type] => post_type
+	 * [menu-item-title] => Gewässerschadenhaftpflicht
+	 * [menu-item-url] => http://dev.makler-simon.de/versicherung/gewaesserschadenhaftpflicht/
+	 * [menu-item-description] =>
+	 * [menu-item-attr-title] =>
+	 * [menu-item-target] =>
+	 * [menu-item-classes] =>
+	 * [menu-item-xfn] =>
+	 * )
+	 */
+
+	function versicherung_import_menu() {
+		$menuname = 'mi-makler';
+		wp_delete_nav_menu( $menuname );
+		$menu_id = wp_create_nav_menu( $menuname );
+
+		// Get the Blueprint:
+		$terms = $this->get_the_source_menu();
+		for ( $i = 0; $i < count($terms); $i ++ ) {
+			$set                = $terms[ $i ];
+			$arrData            = $this->map_the_data( $set, $terms );
+			$item_id            = wp_update_nav_menu_item( $menu_id, 0, $arrData );
+			$terms[ $i ]->mi_id = $item_id;
+		}
+		echo( 'Menu import done<br>' );
+		exit();
+	}
+
+	protected function map_the_data( WP_Post $set, &$terms ) {
+		$object  = $set->object;
+		$arrData = array(
+			'menu-item-object-id'   => 0,
+			'menu-item-object'      => $object,
+			'menu-item-parent-id'   => 0,
+			'menu-item-position'    => $set->menu_order,
+			'menu-item-type'        => $set->type,
+			'menu-item-title'       => $set->title,
+			'menu-item-url'         => $set->url,
+			'menu-item-description' => $set->description,
+			'menu-item-attr-title'  => $set->attr_title,
+			'menu-item-target'      => $set->target,
+			'menu-item-classes'     => is_array( $set->classes ) ? implode( ' ', $set->classes ) : '',
+			'menu-item-xfn'         => $set->xfn,
+			'menu-item-status'      => 'publish'
+		);
+		// get the post:
+		if ( $object == 'versicherung' || $object == 'page' ) {
+			$args     = array(
+				"post_type"      => $object,
+				"name"           => $set->mi_postname,
+				'posts_per_page' => 1
+			);
+			$objQuery = new WP_Query( $args );
+			if ( $objQuery->have_posts() ) {
+				$objQuery->the_post();
+				$arrData['menu-item-object-id'] = get_the_ID();
+				$arrData['menu-item-url']       = get_permalink();
+			} else {
+				echo( $object . ' mit postname ' . $set->mi_postname . ' nicht gefunden!<br>' );
+				$arrData['menu-item-object'] = 'custom';
+				$arrData['menu-item-type']   = 'custom';
+			}
+			wp_reset_postdata();
+		}
+		if ( $object == 'versicherungsgruppe' ) {
+
+		    $taxonomy = get_term_by('slug', $set->mi_postname, 'versicherungsgruppe');
+		    if ($taxonomy) {
+				$arrData['menu-item-object-id'] = $taxonomy->term_id;
+				// $arrData['menu-item-url']       = $term->
+            }
+		}
+		// get the right ID:
+		$old_parent = (int) $set->menu_item_parent;
+		$new_parent = 0;
+		if ( $old_parent != 0 ) {
+			foreach ( $terms as $term ) {
+				if ( $term->ID == $old_parent ) {
+					$new_parent = $term->mi_id;
+					break;
+				}
+			}
+			if ( $new_parent == 0 ) {
+				echo( 'parent_id: ' . $old_parent . ' vorhanden aber new_parent nicht gefunden!<br>' );
+			}
+		}
+		$arrData['menu-item-parent-id'] = $new_parent;
+
+		// search_replace domains:
+        foreach($arrData as $key => $value) {
+            $arrData[$key] = str_replace('dev.ssbgmbh.de', 'dev.makler-simon.de', $value);
+        }
+		return $arrData;
+	}
+
+	protected function get_the_source_menu() {
+		$this->switch_to_source_db();
+		$terms = wp_get_nav_menu_items( 'menu_versicherungen' );
+		foreach ( $terms as $i => $term ) {
+			if ( $term->object == 'versicherung' || $term->object == 'page' ) {
+				$post                     = get_post( $term->object_id );
+				$terms[ $i ]->mi_postname = $post->post_name;
+			}
+			if ( $term->object == 'versicherungsgruppe' ) {
+				$tax = get_term( $term->object_id );
+				$terms[ $i ]->mi_postname = $tax->slug;
+			}
+		}
+		$this->switch_to_this_db();
+
+		return $terms;
+	}
+
+	private function switch_to_source_db() {
+		global $wpdb;
+		$wpdb->select( 'ssbgmbh' );
+		wp_cache_flush();
+	}
+
+	private function switch_to_this_db() {
+		global $wpdb;
+		$wpdb->select( $this->my_database );
+		wp_cache_flush();
+	}
+
 
 }

@@ -157,6 +157,8 @@ class Mi_Versicherung {
 		$this->loader->add_action( 'init', $plugin_admin, 'register_taxonomies' );
 
 		$this->loader->add_action( 'init', $plugin_admin, 'manage_columns' );
+		$this->loader->add_action( 'init', $plugin_admin, 'register_versicherung_admin' );
+
 
 	}
 
@@ -228,6 +230,14 @@ class Mi_Versicherung {
 	public static function mi_get_url_tarifrechner_call( $post_name ) {
 		$base_url = get_site_url() . '/tarifrechner-run/';
 		return add_query_arg( 'tarifrechner_call', $post_name, $base_url );
+	}
+
+	public static function getVersicherungByShortname($title) {
+		$args = array("post_type" => "versicherung", "name" => $title);
+		$objQuery   = new WP_Query( $args );
+		if ( $objQuery->have_posts() ) {
+			$objQuery->the_post();
+		}
 	}
 
 

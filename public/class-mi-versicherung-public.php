@@ -150,7 +150,6 @@ class Mi_Versicherung_Public {
 					$tarifrechner = get_field( 'tarifrechner' );
 					if ( strlen( $tarifrechner ) ) {
 						$arrList[] = $renderLink( array(
-							'titel' => get_field( 'titel' ),
 							'title' => get_the_title(),
 							'url'   => MI_Versicherung::mi_get_url_tarifrechner_call( $post->post_name )
 						) );
