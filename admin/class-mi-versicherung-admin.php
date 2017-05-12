@@ -323,49 +323,106 @@ class Mi_Versicherung_Admin {
 		add_submenu_page( 'edit.php?post_type=versicherung', 'admin', 'admin', 'administrator', 'versicherung_admin_page', array( $this, 'versicherung_admin_page' ) );
 		// Dieser Hook steuert, welche Methode nach submit (action) aufgerufen wird:
 		add_action( 'admin_action_versicherung_import_menu', array( $this, 'versicherung_import_menu' ) );
+		add_action( 'admin_action_versicherung_correct_brochures', array( $this, 'versicherung_correct_brochures' ) );
 	}
 
 	function versicherung_admin_page() {
 		?>
         <div class="wrap">
             <h1 class="wp-heading-inline">Admin Page for Referenzen (ACHTUNG!)</h1>
-
+            <p>Versicherungsmenü von Blaupause übernehmen:</p>
             <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
                 <input type="hidden" name="action" value="versicherung_import_menu"/>
                 <input type="submit" value="Menü für Versicherungen neu aufbauen"/>
             </form>
 
         </div>
+        <br>
+        <h3>Broschüren Ids korrigeren (Neue Broschüren müssen in Media Folder importiert sein)</h3>
+        <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+            <input type="hidden" name="action" value="versicherung_correct_brochures"/>
+            <input type="submit" value="Broschüren Ids korrigieren"/>
+        </form>
+
 		<?php
 	}
 
-	/**
-	 * Array
-	 * (
-	 * [menu-item-db-id] => 0
-	 * [menu-item-object-id] => 2301
-	 * [menu-item-object] => versicherung
-	 * [menu-item-parent-id] => 0
-	 * [menu-item-position] =>
-	 * [menu-item-type] => post_type
-	 * [menu-item-title] => Gewässerschadenhaftpflicht
-	 * [menu-item-url] => http://dev.makler-simon.de/versicherung/gewaesserschadenhaftpflicht/
-	 * [menu-item-description] =>
-	 * [menu-item-attr-title] =>
-	 * [menu-item-target] =>
-	 * [menu-item-classes] =>
-	 * [menu-item-xfn] =>
-	 * )
-	 */
+	public function versicherung_correct_brochures() {
+		$args     = array(
+			'post_type'      => 'versicherung',
+			// 'post_status'    => 'publish',
+			'posts_per_page' => - 1,
+			'orderby'        => 'post_title',
+			'order'          => 'ASC',
+		);
+		$objQuery = new WP_Query( $args );
 
-	function versicherung_import_menu() {
+		$upload_folder_destination = '2017/05';
+		$upload_dir                = wp_upload_dir( $upload_folder_destination );
+
+		while ( $objQuery->have_posts() ) {
+			$objQuery->the_post();
+			// Get the Brochure IDs per Post (could be more than 1:)
+			// $arrSourceIds = array();
+			global $wpdb;
+			while ( have_rows( 'broschuere' ) ) {
+				the_row();
+				// $titel     = get_sub_field( 'broschuere_titel' );
+				$id = (int) get_sub_field( 'broschuere_id' );
+				if ( ! $id ) {
+					echo( 'Ungültige ID: ' . $id . 'für Versicherung: ' . get_the_title() );
+				}
+				$file = get_attached_file( $id );
+				// Datei ist noch nicht vorhanden. Routine nimmt dabei an, dass noch die alte ID im Feld steht:
+				if ( ! is_file( $file ) ) {
+					// go to the blueprint database and get the old ID of the attachment (pdf)
+					$this->switch_to_source_db();
+					$wrong_url = wp_get_attachment_url( $id );
+					$this->switch_to_this_db();
+					// example result:
+					// http://dev.makler-simon.de/wp-content/uploads/versicherungen/55plus_Seniorenversorgung_-_Zielgruppeninformation_fuer___29-03-2016_2.pdf
+					// new base: http://dev.makler-simon.de/wp-content/uploads/2017/05/
+					// $filesize = filesize( get_attached_file( $id ) );
+					// $wrong_url = str_replace( '/uploads/versicherungen/', '/uploads/' . $upload_folder_destination . '/', $wrong_url );
+					// Ich will nur den ersten Teil des Dateinamens haben => 55plus_Seniorenversorgung_-_Zielgruppeninformation_fuer
+					$re      = '/([^\/]+)___/';
+					$matches = array();
+					preg_match_all( $re, $wrong_url, $matches, PREG_SET_ORDER, 0 );
+					$search_for = $matches[0][1];
+					// Nach dem Teilstring der URL suchen in WP_Posts:
+					$attachment = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE guid LIKE '%s';", '%' . $search_for . '%' ) );
+					$mi_id      = (int) $attachment[0];
+					if ( $mi_id > 0 ) {
+						$file = get_attached_file( $mi_id );
+						if ( is_file( $file ) ) {
+							update_sub_field( 'broschuere_id', $mi_id );
+							echo( 'Update: ' . $wrong_url . ' = ' . $file . '<br>' );
+						}
+					} else {
+						echo( '--- Datei nicht gefunden: <br>' );
+						echo( $search_for . '<br>' );
+						echo( print_r( $matches ) );
+						echo( '---<br>' );
+					}
+				} else {
+					echo( "Datei mit ID $id bereits vorhanden: " . $file . '<br>' );
+				}
+			}
+		}
+	}
+
+
+	public function versicherung_import_menu() {
+		echo( 'MI: please remove this line!<br>' );
+		exit;
+		//
 		$menuname = 'mi-makler';
 		wp_delete_nav_menu( $menuname );
 		$menu_id = wp_create_nav_menu( $menuname );
 
 		// Get the Blueprint:
 		$terms = $this->get_the_source_menu();
-		for ( $i = 0; $i < count($terms); $i ++ ) {
+		for ( $i = 0; $i < count( $terms ); $i ++ ) {
 			$set                = $terms[ $i ];
 			$arrData            = $this->map_the_data( $set, $terms );
 			$item_id            = wp_update_nav_menu_item( $menu_id, 0, $arrData );
@@ -413,11 +470,11 @@ class Mi_Versicherung_Admin {
 		}
 		if ( $object == 'versicherungsgruppe' ) {
 
-		    $taxonomy = get_term_by('slug', $set->mi_postname, 'versicherungsgruppe');
-		    if ($taxonomy) {
+			$taxonomy = get_term_by( 'slug', $set->mi_postname, 'versicherungsgruppe' );
+			if ( $taxonomy ) {
 				$arrData['menu-item-object-id'] = $taxonomy->term_id;
 				// $arrData['menu-item-url']       = $term->
-            }
+			}
 		}
 		// get the right ID:
 		$old_parent = (int) $set->menu_item_parent;
@@ -436,9 +493,10 @@ class Mi_Versicherung_Admin {
 		$arrData['menu-item-parent-id'] = $new_parent;
 
 		// search_replace domains:
-        foreach($arrData as $key => $value) {
-            $arrData[$key] = str_replace('dev.ssbgmbh.de', 'dev.makler-simon.de', $value);
-        }
+		foreach ( $arrData as $key => $value ) {
+			$arrData[ $key ] = str_replace( 'dev.ssbgmbh.de', 'dev.makler-simon.de', $value );
+		}
+
 		return $arrData;
 	}
 
@@ -451,7 +509,7 @@ class Mi_Versicherung_Admin {
 				$terms[ $i ]->mi_postname = $post->post_name;
 			}
 			if ( $term->object == 'versicherungsgruppe' ) {
-				$tax = get_term( $term->object_id );
+				$tax                      = get_term( $term->object_id );
 				$terms[ $i ]->mi_postname = $tax->slug;
 			}
 		}

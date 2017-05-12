@@ -35,7 +35,7 @@ class Mi_Versicherung {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      Mi_Versicherung_Loader    $loader    Maintains and registers all hooks for the plugin.
+	 * @var      Mi_Versicherung_Loader $loader Maintains and registers all hooks for the plugin.
 	 */
 	protected $loader;
 
@@ -44,7 +44,7 @@ class Mi_Versicherung {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      string    $plugin_name    The string used to uniquely identify this plugin.
+	 * @var      string $plugin_name The string used to uniquely identify this plugin.
 	 */
 	protected $plugin_name;
 
@@ -53,7 +53,7 @@ class Mi_Versicherung {
 	 *
 	 * @since    1.0.0
 	 * @access   protected
-	 * @var      string    $version    The current version of the plugin.
+	 * @var      string $version The current version of the plugin.
 	 */
 	protected $version;
 
@@ -69,7 +69,7 @@ class Mi_Versicherung {
 	public function __construct() {
 
 		$this->plugin_name = 'mi-versicherung';
-		$this->version = '1.0.0';
+		$this->version     = '1.0.0';
 
 		$this->load_dependencies();
 		$this->set_locale();
@@ -229,15 +229,28 @@ class Mi_Versicherung {
 
 	public static function mi_get_url_tarifrechner_call( $post_name ) {
 		$base_url = get_site_url() . '/tarifrechner-run/';
+
 		return add_query_arg( 'tarifrechner_call', $post_name, $base_url );
 	}
 
-	public static function getVersicherungByShortname($title) {
-		$args = array("post_type" => "versicherung", "name" => $title);
-		$objQuery   = new WP_Query( $args );
+	public static function getVersicherungByShortname( $title ) {
+		$args     = array( "post_type" => "versicherung", "name" => $title );
+		$objQuery = new WP_Query( $args );
 		if ( $objQuery->have_posts() ) {
 			$objQuery->the_post();
 		}
+	}
+
+	public static function getImageID( $image_url ) {
+		global $wpdb;
+		$attachment = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE guid='%s';", $image_url ) );
+		return $attachment[0];
+	}
+
+	public static function getFile($id, $rel_folder) {
+		$upload_dir                = wp_upload_dir( $rel_folder);
+		$file     = get_post_meta( $id, '_wp_attached_file', true );
+		$pdf_path = $upload_dir['basedir'] . '/' . $file;
 	}
 
 

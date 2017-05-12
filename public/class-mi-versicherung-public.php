@@ -218,7 +218,8 @@ class Mi_Versicherung_Public {
 		} );
 
 		add_shortcode( 'mi_vfield_intro', function () {
-			return get_field( 'intro' );
+			// return get_field( 'intro' );
+			return get_post_field('post_content');
 		} );
 
 
