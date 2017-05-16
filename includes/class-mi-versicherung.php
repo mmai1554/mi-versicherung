@@ -247,11 +247,25 @@ class Mi_Versicherung {
 		return $attachment[0];
 	}
 
-	public static function getFile($id, $rel_folder) {
-		$upload_dir                = wp_upload_dir( $rel_folder);
-		$file     = get_post_meta( $id, '_wp_attached_file', true );
-		$pdf_path = $upload_dir['basedir'] . '/' . $file;
+	/**
+	 * checks if Tarifrechner URL belongs to Mr Money Tarifrechner:
+	 * @param $tarifrechner
+	 * @return bool
+	 */
+	public static function isMrMoney($tarifrechner) {
+		return strpos($tarifrechner, 'mr-money.de/') !== false;
 	}
+
+	public static function getTarifrechnerURL($tarifrechner) {
+		if (Mi_Versicherung::isMrMoney($tarifrechner)) {
+			if (strpos(strtolower($tarifrechner), 'ur_id') === false) {
+				$tarifrechner .= '&ur_iD=mobile';
+			}
+		}
+		return $tarifrechner;
+	}
+
+
 
 
 }
