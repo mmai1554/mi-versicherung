@@ -119,6 +119,12 @@ class Mi_Versicherung {
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-mi-versicherung-public.php';
 
+		/**
+		 * The class for rendering the Versicherung-Page
+		 * side of the site.
+		 */
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-mi-versicherung-layout.php';
+
 		$this->loader = new Mi_Versicherung_Loader();
 
 	}
@@ -229,7 +235,6 @@ class Mi_Versicherung {
 
 	public static function mi_get_url_tarifrechner_call( $post_name ) {
 		$base_url = get_site_url() . '/tarifrechner-run/';
-
 		return add_query_arg( 'tarifrechner_call', $post_name, $base_url );
 	}
 
@@ -264,6 +269,18 @@ class Mi_Versicherung {
 		}
 		return $tarifrechner;
 	}
+
+	public static function hasTarifrechner(WP_Post $post) {
+		$field = get_field('tarifrechner', $post->ID);
+		return trim($field) != '';
+	}
+
+	public static function hasVideos(WP_Post $post) {
+		$field = get_field('video_url', $post->ID);
+		return trim($field) != '';
+	}
+
+
 
 
 

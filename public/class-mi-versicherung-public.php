@@ -214,7 +214,7 @@ class Mi_Versicherung_Public {
 
 
 		add_shortcode( 'mi_vfield_titel', function () {
-			return get_field( 'titel' );
+			return get_field( 'title' );
 		} );
 
 		add_shortcode( 'mi_vfield_intro', function () {
@@ -274,27 +274,28 @@ class Mi_Versicherung_Public {
 	}
 
 	function register_filter_content() {
-		add_filter( 'the_content', function ( $content ) {
-			if ( $GLOBALS['post_type'] == 'versicherung' ) {
-				// Das aktuelle Posts Objekt ist nicht mehr Versicherung an dieser Stelle sondern das Tunnel-Template
-				// Der Versicherungs-CPT versteckt sich im Head des posts Arrays:
-				$objVersicherung = $GLOBALS['posts'][0];
-				if ( $objVersicherung instanceof WP_Post ) {
-					$id = $GLOBALS['posts'][0]->ID;
-					if ( ! have_rows( 'broschuere', $id ) ) {
-						$content = str_replace( 'mi-nop-broschuere', 'mi-hide', $content );
-					}
-					if ( ! strlen( get_field( 'tarifrechner', $id ) ) ) {
-						$content = str_replace( 'mi-nop-tarifrechner', 'mi-hide', $content );
-					}
-					if ( ! strlen( get_field( 'video_url', $id ) ) ) {
-						$content = str_replace( 'mi-nop-video', 'mi-hide', $content );
-					}
-				}
-			}
-
-			return $content;
-		} );
+		// Das übernimmt jetzt die Klasse versicherung-layout:
+//		add_filter( 'the_content', function ( $content ) {
+//			if ( $GLOBALS['post_type'] == 'versicherung' ) {
+//				// Das aktuelle Posts Objekt ist nicht mehr Versicherung an dieser Stelle sondern das Tunnel-Template
+//				// Der Versicherungs-CPT versteckt sich im Head des posts Arrays:
+//				$objVersicherung = $GLOBALS['posts'][0];
+//				if ( $objVersicherung instanceof WP_Post ) {
+//					$id = $GLOBALS['posts'][0]->ID;
+//					if ( ! have_rows( 'broschuere', $id ) ) {
+//						$content = str_replace( 'mi-nop-broschuere', 'mi-hide', $content );
+//					}
+//					if ( ! strlen( get_field( 'tarifrechner', $id ) ) ) {
+//						$content = str_replace( 'mi-nop-tarifrechner', 'mi-hide', $content );
+//					}
+//					if ( ! strlen( get_field( 'video_url', $id ) ) ) {
+//						$content = str_replace( 'mi-nop-video', 'mi-hide', $content );
+//					}
+//				}
+//			}
+//
+//			return $content;
+//		} );
 	}
 
 	function register_query_vars() {
