@@ -101,6 +101,17 @@ class Mi_Versicherung_Public {
 
 	}
 
+
+	function register_shortcode_show_menu_inline() {
+		add_shortcode( 'mi_menu_inline', function ( $atts ) {
+			$terms = wp_get_nav_menu_items( 'mi-makler' );
+			foreach ( $terms as $i => $term ) {
+				$arrM[] = $term;
+			}
+		});
+	}
+
+
 	function generate_versicherung_rules() {
 		add_rewrite_rule( '^versicherung/([^/]*)/([^/]*)/?',
 			'index.php?zielgruppe=$matches[1]&versicherungsgruppe=$matches[2]',
