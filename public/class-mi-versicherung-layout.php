@@ -42,6 +42,7 @@ class Mi_VersicherungLayout {
 			$html = $this->replaceDownload( $html );
 			$html = $this->replaceTarifrechner( $html );
 			$html = $this->replaceVideos( $html );
+			$html = $this->replaceBackgroundImage($html);
 
 			return $html;
 		} else {
@@ -130,6 +131,17 @@ class Mi_VersicherungLayout {
 ////			$a = $matches;
 //			return $replacement;
 		}
+	}
+
+	private function replaceBackgroundImage($html) {
+		$old = 'mi-versicherung-header';
+		if (Mi_Versicherung::isPrivatkunde($this->post)) {
+			$new_id = 'mi-versicherung-header-pk';
+		} else {
+			$new_id = 'mi-versicherung-header-gk';
+		}
+		$html = str_replace($old, $new_id, $html);
+		return $html;
 	}
 
 

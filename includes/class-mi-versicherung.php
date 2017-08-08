@@ -280,6 +280,18 @@ class Mi_Versicherung {
 		return trim($field) != '';
 	}
 
+	public static function isPrivatkunde(WP_Post $post) {
+		$taxonomies = get_the_terms( $post , 'zielgruppe');
+		if (is_array($taxonomies)) {
+			foreach($taxonomies as $tax) {
+				if ($tax->name == 'Privatkunden') {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 
 
 
