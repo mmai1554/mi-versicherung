@@ -323,6 +323,7 @@ class Mi_Versicherung_Admin {
 		add_submenu_page( 'edit.php?post_type=versicherung', 'admin', 'admin', 'administrator', 'versicherung_admin_page', array( $this, 'versicherung_admin_page' ) );
 		// Dieser Hook steuert, welche Methode nach submit (action) aufgerufen wird:
 		add_action( 'admin_action_versicherung_import_menu', array( $this, 'versicherung_import_menu' ) );
+		add_action( 'admin_action_versicherung_remove_drafts_from_menu', array( $this, 'remove_drafts_from_menu' ) );
 		add_action( 'admin_action_versicherung_correct_brochures', array( $this, 'versicherung_correct_brochures' ) );
 	}
 
@@ -338,6 +339,12 @@ class Mi_Versicherung_Admin {
 
         </div>
         <br>
+        <h3>Versicherungen im Status Entwurf aus dem Menü mi-makler entfernen</h3>
+        <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+            <input type="hidden" name="action" value="versicherung_remove_drafts_from_menu"/>
+            <input type="submit" value="Einträge entfernen"/>
+        </form>
+        <br>
         <h3>Broschüren Ids korrigeren (Neue Broschüren müssen in Media Folder importiert sein)</h3>
         <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
             <input type="hidden" name="action" value="versicherung_correct_brochures"/>
@@ -348,7 +355,8 @@ class Mi_Versicherung_Admin {
 	}
 
 	public function versicherung_correct_brochures() {
-		$args     = array(
+		global $post;
+	    $args     = array(
 			'post_type'      => 'versicherung',
 			// 'post_status'    => 'publish',
 			'posts_per_page' => - 1,
@@ -357,7 +365,7 @@ class Mi_Versicherung_Admin {
 		);
 		$objQuery = new WP_Query( $args );
 
-		$upload_folder_destination = '2017/05';
+		$upload_folder_destination = '2017/08';
 		$upload_dir                = wp_upload_dir( $upload_folder_destination );
 
 		while ( $objQuery->have_posts() ) {
@@ -399,21 +407,52 @@ class Mi_Versicherung_Admin {
 							echo( 'Update: ' . $wrong_url . ' = ' . $file . '<br>' );
 						}
 					} else {
-						echo( '--- Datei nicht gefunden: <br>' );
 						echo( $search_for . '<br>' );
-						echo( print_r( $matches ) );
-						echo( '---<br>' );
+						$arr = array( 'ID' => $post->ID, 'post_status' => 'draft' );
+						// wp_update_post($arr);
+						echo( 'updated Versicherung with ID '.$post->ID. ' to status Draft<br>');
+						// echo( '---<br>' );
 					}
 				} else {
-					echo( "Datei mit ID $id bereits vorhanden: " . $file . '<br>' );
+					// echo( "Datei mit ID $id bereits vorhanden: " . $file . '<br>' );
 				}
 			}
+		}
+		echo('<p>Fehlende Versicherungs Entitäten:</p>');
+		$this->checkBrochuresAgainstVersicherungen();
+	}
+
+	/**
+	 * iterates through all brochures and displays the ones whose versicherung entity is missing:
+	 */
+	public function checkBrochuresAgainstVersicherungen() {
+		/**
+		 * @var $post WP_Post
+		 */
+	    global $post;
+	    global $wpdb;
+	    // $upload_folder_destination = '2017/08';
+		$args = array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'application/pdf',// video files include
+			'post_status'    => 'inherit',
+			'orderby'        => 'post_title',
+			'posts_per_page' =>  -1,
+		);
+		$objQuery = new WP_Query( $args );
+		while ( $objQuery->have_posts() ) {
+			$objQuery->the_post();
+			$id = $post->ID;
+			$result = $wpdb->get_col( $wpdb->prepare( "SELECT COUNT(*) FROM wp_postmeta WHERE meta_value = '%s' AND meta_key IN('broschuere_0_broschuere_id', 'broschuere_1_broschuere_id', 'broschuere_2_broschuere_id') > 0;", $id ) );
+			if ($result[0] == 0) {
+			    echo($post->post_title . '<br>');
+            }
 		}
 	}
 
 
 	public function versicherung_import_menu() {
-		echo( 'MI: please remove this line!<br>' );
+		echo( '<p class="alert alert-warning">MI: DISABLED The Menu would be overwritten. If you really want this, remove the exit line in this method.</p>' );
 		exit;
 		//
 		$menuname = 'mi-makler';
@@ -500,6 +539,19 @@ class Mi_Versicherung_Admin {
 		return $arrData;
 	}
 
+	public function remove_drafts_from_menu() {
+		$terms = wp_get_nav_menu_items( 'mi-makler' );
+		foreach ( $terms as $i => $term ) {
+			if ( $term->object == 'versicherung' || $term->object == 'page' ) {
+				$post                     = get_post( $term->object_id );
+				if ($post->post_status == 'draft') {
+				    echo('Disable '.$term->object.' with post ID '.$post->ID.'<br>');
+				    wp_delete_post($term->ID);
+                }
+			}
+		}
+    }
+
 	protected function get_the_source_menu() {
 		$this->switch_to_source_db();
 		$terms = wp_get_nav_menu_items( 'menu_versicherungen' );
@@ -520,7 +572,7 @@ class Mi_Versicherung_Admin {
 
 	private function switch_to_source_db() {
 		global $wpdb;
-		$wpdb->select( 'ssbgmbh' );
+		$wpdb->select( 'simonvm' );
 		wp_cache_flush();
 	}
 
