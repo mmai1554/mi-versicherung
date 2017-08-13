@@ -159,6 +159,7 @@ class Mi_Versicherung {
 
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
+
 		$this->loader->add_action( 'init', $plugin_admin, 'register_cpt_versicherung' );
 		$this->loader->add_action( 'init', $plugin_admin, 'register_taxonomies' );
 
@@ -183,8 +184,12 @@ class Mi_Versicherung {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
 		$this->loader->add_action( 'generate_rewrite_rules', $plugin_public, 'generate_versicherung_rules' );
+
+		// $this->loader->add_filter('submenu_limit', $plugin_public, 'submenu_limit', 10, 2);
+
 		$this->loader->add_action( 'init', $plugin_public, 'register_shortcode_tarifrechnerliste' );
 		$this->loader->add_action( 'init', $plugin_public, 'register_shortcode_template_fields' );
+		$this->loader->add_action( 'init', $plugin_public, 'register_shortcode_show_menu_inline' );
 		$this->loader->add_action( 'init', $plugin_public, 'register_filter_content' );
 		$this->loader->add_action( 'init', $plugin_public, 'register_query_vars' );
 		$this->loader->add_action( 'init', $plugin_public, 'register_search_query' );

@@ -104,9 +104,49 @@ class Mi_Versicherung_Public {
 
 	function register_shortcode_show_menu_inline() {
 		add_shortcode( 'mi_menu_inline', function ( $atts ) {
-			$terms = wp_get_nav_menu_items( 'mi-makler' );
-			foreach ( $terms as $i => $term ) {
-				$arrM[] = $term;
+			$a          = shortcode_atts( array(
+				'topic' => '',
+				'zielgruppe' => ''
+			), $atts );
+			$children_collector = function($parent_id, $start_index) use (&$children_collector, &$terms) {
+				$children = [];
+				for($i = $start_index; $i < count($terms); $i++) {
+					$term = $terms[$i];
+					if( $term->menu_item_parent == $parent_id) {
+						$children[] = array(
+							'title' => $term->title,
+							'id' => $term->ID,
+							'url' => $term->url,
+							'menu_items' => $children_collector($term->ID, $i)
+						);
+					}
+				}
+				return $children;
+			};
+			$zielgruppe = $a['zielgruppe'];
+//			$topic = $a['topic'];
+			$terms = wp_get_nav_menu_items( 'mi-makler');
+			if (count($terms) > 0) {
+				$root = $terms[0];
+				foreach($terms as $term) {
+					$title = strtolower($term->title);
+					if($title == $zielgruppe) {
+						$root = $term;
+						break;
+					}
+				}
+				$mi_menu = [
+					'title' => $root->title,
+					'url' => $root->url,
+					'id' => $root->ID,
+					'menu_items' => $children_collector($root->ID, 1)
+				];
+				$items = $mi_menu['menu_items'];
+				ob_start();
+				include(get_stylesheet_directory() . '/templates/accordion_item.php');
+				return ob_get_clean();
+			} else {
+				return '';
 			}
 		});
 	}
@@ -117,6 +157,7 @@ class Mi_Versicherung_Public {
 			'index.php?zielgruppe=$matches[1]&versicherungsgruppe=$matches[2]',
 			'top' );
 	}
+
 
 	function register_shortcode_tarifrechnerliste() {
 		add_shortcode( 'mi_versicherung_liste_tarifrechner', function ( $atts ) {
@@ -323,6 +364,38 @@ class Mi_Versicherung_Public {
 				$query->set( 'post__not_in', array( 398 ) );
 			}
 		} );
+	}
+
+	public function submenu_limit( $items, $args ) {
+
+		if ( empty( $args->submenu ) ) {
+			return $items;
+		}
+
+		$ids       = wp_filter_object_list( $items, array( 'title' => $args->submenu ), 'and', 'ID' );
+		$parent_id = array_pop( $ids );
+		$children  = $this->submenu_get_children_ids( $parent_id, $items );
+
+		foreach ( $items as $key => $item ) {
+
+			if ( ! in_array( $item->ID, $children ) ) {
+				unset( $items[$key] );
+			}
+		}
+
+		return $items;
+	}
+
+	protected function submenu_get_children_ids( $id, $items ) {
+
+		$ids = wp_filter_object_list( $items, array( 'menu_item_parent' => $id ), 'and', 'ID' );
+
+		foreach ( $ids as $id ) {
+
+			$ids = array_merge( $ids, $this->submenu_get_children_ids( $id, $items ) );
+		}
+
+		return $ids;
 	}
 
 

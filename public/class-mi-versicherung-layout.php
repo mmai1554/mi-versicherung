@@ -43,7 +43,6 @@ class Mi_VersicherungLayout {
 			$html = $this->replaceTarifrechner( $html );
 			$html = $this->replaceVideos( $html );
 			$html = $this->replaceBackgroundImage($html);
-
 			return $html;
 		} else {
 			return $this->renderNotFound();
