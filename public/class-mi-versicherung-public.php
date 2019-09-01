@@ -358,6 +358,7 @@ class Mi_Versicherung_Public {
 		} );
 	}
 
+	// Dont show the BB Demo Page:
 	function register_search_query() {
 		add_action( 'pre_get_posts', function ( WP_Query $query ) {
 			if ( ! $query->is_admin && $query->is_search && $query->is_main_query() ) {
