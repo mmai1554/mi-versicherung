@@ -135,7 +135,6 @@ class Mi_Versicherung_Public {
 						break;
 					}
 				}
-				$a = 'hallo';
 				$mi_menu = [
 					'title' => $root->title,
 					'url' => $root->url,
