@@ -187,7 +187,7 @@ class Mi_Versicherung_Admin {
 			'show_in_nav_menus' => true,
 			'show_tagcloud'     => true,
 		);
-		register_taxonomy( 'versicherungsgruppe', array( 'versicherung' ), $args );
+		register_taxonomy( 'versicherungsgruppe', array( 'attachment', 'versicherung' ), $args );
 
 		$labels = array(
 			'name'                       => _x( 'Zielgruppen', 'Taxonomy General Name', 'text_domain' ),
@@ -220,7 +220,7 @@ class Mi_Versicherung_Admin {
 			'show_in_nav_menus' => true,
 			'show_tagcloud'     => true,
 		);
-		register_taxonomy( 'zielgruppe', array( 'versicherung' ), $args );
+		register_taxonomy( 'zielgruppe', array( 'attachment', 'versicherung' ), $args );
 
 	}
 
@@ -241,6 +241,41 @@ class Mi_Versicherung_Admin {
 			// set breakpoint here and lookup array columns:
 			return $arrReturn;
 		} );
+
+		add_filter( 'manage_edit-versicherung_sortable_columns', function ( $columns ) {
+			$columns['taxonomy-versicherungsgruppe'] = 'versicherungsgruppe';
+			$columns['taxonomy-zielgruppe']          = 'zielgruppe';
+
+			//To make a column 'un-sortable' remove it from the array
+			//unset($columns['date']);
+
+			return $columns;
+		} );
+
+
+		add_filter( 'posts_clauses', function ( $clauses, $query ) {
+			global $wpdb;
+
+			foreach ( array( 'versicherungsgruppe', 'zielgruppe' ) as $my_tax ) {
+				if ( isset( $query->query['orderby'] ) && $my_tax == $query->query['orderby'] ) {
+
+					$clauses['join'] .= <<<SQL
+    LEFT OUTER JOIN {$wpdb->term_relationships} ON {$wpdb->posts}.ID={$wpdb->term_relationships}.object_id
+    LEFT OUTER JOIN {$wpdb->term_taxonomy} USING (term_taxonomy_id)
+    LEFT OUTER JOIN {$wpdb->terms} USING (term_id)
+SQL;
+
+					$clauses['where']   .= " AND (taxonomy = '" . $my_tax . "' OR taxonomy IS NULL)";
+					$clauses['groupby'] = "object_id";
+					$clauses['orderby'] = "GROUP_CONCAT({$wpdb->terms}.name ORDER BY name ASC) ";
+					$clauses['orderby'] .= ( 'ASC' == strtoupper( $query->get( 'order' ) ) ) ? 'ASC' : 'DESC';
+				}
+			}
+
+			return $clauses;
+		},
+			10, 2 );
+
 
 		add_action( 'manage_versicherung_posts_custom_column', function ( $column, $post_id ) {
 			global $post;
@@ -292,6 +327,8 @@ class Mi_Versicherung_Admin {
 					break;
 			}
 		}, 10, 2 );
+
+
 		add_action( 'pre_get_posts', function ( WP_Query $query ) {
 			if ( ! is_admin() ) {
 				return;
@@ -325,6 +362,7 @@ class Mi_Versicherung_Admin {
 		add_action( 'admin_action_versicherung_import_menu', array( $this, 'versicherung_import_menu' ) );
 		add_action( 'admin_action_versicherung_remove_drafts_from_menu', array( $this, 'remove_drafts_from_menu' ) );
 		add_action( 'admin_action_versicherung_correct_brochures', array( $this, 'versicherung_correct_brochures' ) );
+		add_action( 'admin_action_versicherung_map_brochures', array( $this, 'versicherung_map_brochures' ) );
 	}
 
 	function versicherung_admin_page() {
@@ -336,7 +374,6 @@ class Mi_Versicherung_Admin {
                 <input type="hidden" name="action" value="versicherung_import_menu"/>
                 <input type="submit" value="Menü für Versicherungen neu aufbauen"/>
             </form>
-
         </div>
         <br>
         <h3>Versicherungen im Status Entwurf aus dem Menü mi-makler entfernen</h3>
@@ -350,13 +387,127 @@ class Mi_Versicherung_Admin {
             <input type="hidden" name="action" value="versicherung_correct_brochures"/>
             <input type="submit" value="Broschüren Ids korrigieren"/>
         </form>
+        <h3>Manuelles Mapping Versicherungen zu Broschüren:</h3>
+        <form method="POST" action="<?php echo admin_url( 'admin.php' ); ?>">
+            <input type="hidden" name="action" value="versicherung_map_brochures"/>
+            <table>
+				<?php $brochueres = $this->getBroschuerenOhneVersicherung();
+				foreach ( $brochueres as $key => $title ) {
+					$brochueres[ $key ] = trim( preg_replace( "/\d+\./", "", $title ) );
+				}
+				asort( $brochueres );
+				$stack_of_options = array( '<option value="">Bitte wählen</option>' );
+				foreach ( $brochueres as $key => $title ) {
+					$stack_of_options[] = '<option value="' . $key . '">' . $title . '</option>';
+				}
+				$versicherungen = $this->getVersicherungenOhneBroschuere();
+				foreach ( $versicherungen as $post_id => $title ) {
+					echo( '<tr>' );
+					echo( '<td style="padding-bottom:5px; border-bottom:1px solid #CCC;">' . $title . '</td>' );
+					echo( '<td style="padding-bottom:5px; border-bottom:1px solid #CCC;">' );
+					echo( '<select name="versicherung[' . $post_id . ']" >' . implode( "\n", $stack_of_options ) . '</select>' );
+					echo( '</td>' );
+					echo( '</tr>' );
+				}
+				?>
+            </table>
+            <input type="submit" value="Mapping anwenden"/>
+        </form>
 
 		<?php
 	}
 
+	protected function getVersicherungenOhneBroschuere( $upload_folder = '2017/08' ) {
+		global $post;
+		$args     = array(
+			'post_type'      => 'versicherung',
+			// 'post_status'    => 'publish',
+			'posts_per_page' => - 1,
+			'orderby'        => 'post_title',
+			'order'          => 'ASC',
+		);
+		$objQuery = new WP_Query( $args );
+		// $upload_dir                = wp_upload_dir( $upload_folder);
+		$arrList = array();
+		while ( $objQuery->have_posts() ) {
+			$objQuery->the_post();
+			// Get the Brochure IDs per Post (could be more than 1:)
+			// $arrSourceIds = array();
+			global $wpdb;
+			while ( have_rows( 'broschuere' ) ) {
+				the_row();
+				// $titel     = get_sub_field( 'broschuere_titel' );
+				$id = (int) get_sub_field( 'broschuere_id' );
+				if ( ! $id ) {
+					$arrList[ $post->ID ] = $post->ID;
+				}
+				$file = get_attached_file( $id );
+				if ( ! is_file( $file ) ) {
+					$arrList[ $post->ID ] = $post->post_title;
+				}
+			}
+		}
+
+		return $arrList;
+	}
+
+	protected function getBroschuerenOhneVersicherung() {
+		/**
+		 * @var $post WP_Post
+		 */
+		global $post;
+		global $wpdb;
+		$arrList = array();
+		// $upload_folder_destination = '2017/08';
+		$args     = array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'application/pdf',// video files include
+			'post_status'    => 'inherit',
+			'orderby'        => 'post_title',
+			'posts_per_page' => - 1,
+		);
+		$objQuery = new WP_Query( $args );
+		while ( $objQuery->have_posts() ) {
+			$objQuery->the_post();
+			$id     = $post->ID;
+			$result = $wpdb->get_col( $wpdb->prepare( "SELECT COUNT(*) FROM wp_postmeta WHERE meta_value = '%s' AND meta_key IN('broschuere_0_broschuere_id', 'broschuere_1_broschuere_id', 'broschuere_2_broschuere_id') > 0;", $id ) );
+			if ( $result[0] == 0 ) {
+				$arrList[ $post->ID ] = $post->post_title;
+			}
+		}
+
+		return $arrList;
+	}
+
+	public function versicherung_map_brochures() {
+		global $wpdb;
+		$to_map = $_POST['versicherung'];
+		$to_map = array_filter($to_map, function ($value) { return $value <> ''; });
+		foreach ( $to_map as $post_id => $attachment_id ) {
+			$objFound = $wpdb->get_row( sprintf( "SELECT COUNT(*) as count FROM wp_postmeta WHERE post_id='%s' AND meta_key='broschuere_0_broschuere_id'", $post_id ));
+			if ( $objFound->count > 0 ) {
+				$sql = sprintf( "UPDATE wp_postmeta SET meta_value = '%s' WHERE post_id='%s' AND meta_key='broschuere_0_broschuere_id'", $attachment_id, $post_id );
+				echo( '<p>Update: ' . $sql . '</p>' );
+			    $wpdb->query($sql);
+			} else {
+				$arrInsert = array(
+					'broschuere_0_broschuere_titel'  => 'Infobroschüre',
+					'_broschuere_0_broschuere_titel' => 'field_574d5f8215cd0',
+					'broschuere_0_broschuere_id'     => $attachment_id,
+					'_broschuere_0_broschuere_id'    => 'field_574d5f9415cd1'
+				);
+				foreach($arrInsert as $field => $value) {
+				    $sql       = sprintf( "INSERT INTO wp_postmeta (post_id, meta_key, meta_value)", $post_id, $field, $value);
+				    echo( '<p>INSERT: ' . $sql . '</p>' );
+			        $wpdb->query($sql);
+				}
+			}
+		}
+	}
+
 	public function versicherung_correct_brochures() {
 		global $post;
-	    $args     = array(
+		$args     = array(
 			'post_type'      => 'versicherung',
 			// 'post_status'    => 'publish',
 			'posts_per_page' => - 1,
@@ -410,7 +561,7 @@ class Mi_Versicherung_Admin {
 						echo( $search_for . '<br>' );
 						$arr = array( 'ID' => $post->ID, 'post_status' => 'draft' );
 						// wp_update_post($arr);
-						echo( 'updated Versicherung with ID '.$post->ID. ' to status Draft<br>');
+						echo( 'updated Versicherung with ID ' . $post->ID . ' to status Draft<br>' );
 						// echo( '---<br>' );
 					}
 				} else {
@@ -418,7 +569,7 @@ class Mi_Versicherung_Admin {
 				}
 			}
 		}
-		echo('<p>Fehlende Versicherungs Entitäten:</p>');
+		echo( '<p>Fehlende Versicherungs Entitäten:</p>' );
 		$this->checkBrochuresAgainstVersicherungen();
 	}
 
@@ -429,24 +580,24 @@ class Mi_Versicherung_Admin {
 		/**
 		 * @var $post WP_Post
 		 */
-	    global $post;
-	    global $wpdb;
-	    // $upload_folder_destination = '2017/08';
-		$args = array(
+		global $post;
+		global $wpdb;
+		// $upload_folder_destination = '2017/08';
+		$args     = array(
 			'post_type'      => 'attachment',
 			'post_mime_type' => 'application/pdf',// video files include
 			'post_status'    => 'inherit',
 			'orderby'        => 'post_title',
-			'posts_per_page' =>  -1,
+			'posts_per_page' => - 1,
 		);
 		$objQuery = new WP_Query( $args );
 		while ( $objQuery->have_posts() ) {
 			$objQuery->the_post();
-			$id = $post->ID;
+			$id     = $post->ID;
 			$result = $wpdb->get_col( $wpdb->prepare( "SELECT COUNT(*) FROM wp_postmeta WHERE meta_value = '%s' AND meta_key IN('broschuere_0_broschuere_id', 'broschuere_1_broschuere_id', 'broschuere_2_broschuere_id') > 0;", $id ) );
-			if ($result[0] == 0) {
-			    echo($post->post_title . '<br>');
-            }
+			if ( $result[0] == 0 ) {
+				echo( $post->post_title . '<br>' );
+			}
 		}
 	}
 
@@ -543,14 +694,14 @@ class Mi_Versicherung_Admin {
 		$terms = wp_get_nav_menu_items( 'mi-makler' );
 		foreach ( $terms as $i => $term ) {
 			if ( $term->object == 'versicherung' || $term->object == 'page' ) {
-				$post                     = get_post( $term->object_id );
-				if ($post->post_status == 'draft') {
-				    echo('Disable '.$term->object.' with post ID '.$post->ID.'<br>');
-				    wp_delete_post($term->ID);
-                }
+				$post = get_post( $term->object_id );
+				if ( $post->post_status == 'draft' ) {
+					echo( 'Disable ' . $term->object . ' with post ID ' . $post->ID . '<br>' );
+					wp_delete_post( $term->ID );
+				}
 			}
 		}
-    }
+	}
 
 	protected function get_the_source_menu() {
 		$this->switch_to_source_db();
@@ -572,7 +723,7 @@ class Mi_Versicherung_Admin {
 
 	private function switch_to_source_db() {
 		global $wpdb;
-		$wpdb->select( 'simonvm' );
+		$wpdb->select( 'hvd' );
 		wp_cache_flush();
 	}
 
